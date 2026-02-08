@@ -4,15 +4,31 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
+// FileTemplate represents a file to be created inside a directory.
+type FileTemplate struct {
+	Name    string `yaml:"name"`
+	Content string `yaml:"content,omitempty"`
+}
+
+// Variable represents a user-prompted variable for template expansion.
+type Variable struct {
+	Name    string `yaml:"name"`
+	Prompt  string `yaml:"prompt,omitempty"`
+	Default string `yaml:"default,omitempty"`
+}
+
 // Directory represents a single directory node in a template tree.
 type Directory struct {
-	Name     string      `yaml:"name"`
-	Children []Directory `yaml:"children,omitempty"`
+	Name     string         `yaml:"name"`
+	Children []Directory    `yaml:"children,omitempty"`
+	Files    []FileTemplate `yaml:"files,omitempty"`
+	Optional bool           `yaml:"optional,omitempty"`
 }
 
 // Template represents a project template with its directory structure.
@@ -21,6 +37,9 @@ type Template struct {
 	Name        string      `yaml:"name"`
 	BasePath    string      `yaml:"base_path"`
 	Directories []Directory `yaml:"directories"`
+	Hooks       []string    `yaml:"hooks,omitempty"`
+	Variables   []Variable  `yaml:"variables,omitempty"`
+	Extends     string      `yaml:"extends,omitempty"`
 }
 
 // Config is the root configuration containing all templates.
@@ -41,13 +60,26 @@ func (v ValidationError) Error() string {
 
 // reservedIDs are subcommand names that cannot be used as template IDs.
 var reservedIDs = map[string]bool{
-	"list":    true,
-	"config":  true,
-	"doctor":  true,
-	"help":    true,
-	"install": true,
-	"search":  true,
-	"reindex": true,
+	"list":       true,
+	"config":     true,
+	"doctor":     true,
+	"help":       true,
+	"install":    true,
+	"search":     true,
+	"reindex":    true,
+	"open":       true,
+	"completion": true,
+	"tree":       true,
+	"path":       true,
+	"recent":     true,
+	"stats":      true,
+	"rename":     true,
+	"archive":    true,
+	"export":     true,
+	"import":     true,
+	"init":       true,
+	"diff":       true,
+	"version":    true,
 }
 
 // Load reads and parses the config file at the given path.
@@ -117,13 +149,73 @@ func (c *Config) Validate() []ValidationError {
 			})
 		}
 
-		if len(t.Directories) == 0 {
+		if len(t.Directories) == 0 && t.Extends == "" {
 			errs = append(errs, ValidationError{
 				Field:   prefix + ".directories",
 				Message: "at least one directory is required",
 			})
-		} else {
+		} else if len(t.Directories) > 0 {
 			errs = append(errs, validateDirs(t.Directories, prefix+".directories", 0)...)
+		}
+
+		for j, v := range t.Variables {
+			vp := fmt.Sprintf("%s.variables[%d]", prefix, j)
+			if v.Name == "" {
+				errs = append(errs, ValidationError{
+					Field:   vp + ".name",
+					Message: "variable name is required",
+				})
+			} else if !varNameRe.MatchString(v.Name) {
+				errs = append(errs, ValidationError{
+					Field:   vp + ".name",
+					Message: fmt.Sprintf("variable name %q must match [a-zA-Z_][a-zA-Z0-9_]*", v.Name),
+				})
+			}
+		}
+	}
+
+	// Validate extends references (second pass — all IDs are now known)
+	for i, t := range c.Templates {
+		if t.Extends == "" {
+			continue
+		}
+		prefix := fmt.Sprintf("templates[%d]", i)
+		if !seen[t.Extends] {
+			errs = append(errs, ValidationError{
+				Field:   prefix + ".extends",
+				Message: fmt.Sprintf("extends %q references unknown template", t.Extends),
+			})
+		}
+		if t.Extends == t.ID {
+			errs = append(errs, ValidationError{
+				Field:   prefix + ".extends",
+				Message: "template cannot extend itself",
+			})
+		}
+	}
+
+	// Check for circular inheritance
+	for i, t := range c.Templates {
+		if t.Extends == "" {
+			continue
+		}
+		prefix := fmt.Sprintf("templates[%d]", i)
+		visited := map[string]bool{t.ID: true}
+		current := t.Extends
+		for current != "" {
+			if visited[current] {
+				errs = append(errs, ValidationError{
+					Field:   prefix + ".extends",
+					Message: fmt.Sprintf("circular inheritance detected involving %q", current),
+				})
+				break
+			}
+			visited[current] = true
+			parent := c.FindTemplate(current)
+			if parent == nil {
+				break
+			}
+			current = parent.Extends
 		}
 	}
 
@@ -131,6 +223,8 @@ func (c *Config) Validate() []ValidationError {
 }
 
 const maxDepth = 20
+
+var varNameRe = regexp.MustCompile(`^[a-zA-Z_]\w*$`)
 
 func validateDirs(dirs []Directory, prefix string, depth int) []ValidationError {
 	var errs []ValidationError
@@ -151,6 +245,15 @@ func validateDirs(dirs []Directory, prefix string, depth int) []ValidationError 
 				Message: "directory name is required",
 			})
 		}
+		for j, f := range d.Files {
+			fp := fmt.Sprintf("%s.files[%d]", p, j)
+			if f.Name == "" {
+				errs = append(errs, ValidationError{
+					Field:   fp + ".name",
+					Message: "file name is required",
+				})
+			}
+		}
 		if len(d.Children) > 0 {
 			errs = append(errs, validateDirs(d.Children, p+".children", depth+1)...)
 		}
@@ -165,6 +268,86 @@ func (c *Config) FindTemplate(id string) *Template {
 		if c.Templates[i].ID == id {
 			return &c.Templates[i]
 		}
+	}
+	return nil
+}
+
+// ResolveTemplate returns a fully-merged template by following the extends
+// chain. The returned template is a deep copy — safe to modify.
+func (c *Config) ResolveTemplate(id string) (*Template, error) {
+	tmpl := c.FindTemplate(id)
+	if tmpl == nil {
+		return nil, fmt.Errorf("template %q not found", id)
+	}
+
+	if tmpl.Extends == "" {
+		cp := *tmpl
+		return &cp, nil
+	}
+
+	// Collect inheritance chain (child-first)
+	chain := []*Template{tmpl}
+	visited := map[string]bool{id: true}
+	current := tmpl.Extends
+	for current != "" {
+		if visited[current] {
+			return nil, fmt.Errorf("circular inheritance at %q", current)
+		}
+		visited[current] = true
+		parent := c.FindTemplate(current)
+		if parent == nil {
+			return nil, fmt.Errorf("parent template %q not found", current)
+		}
+		chain = append(chain, parent)
+		current = parent.Extends
+	}
+
+	// Merge: start from root ancestor, overlay children
+	merged := Template{}
+	for i := len(chain) - 1; i >= 0; i-- {
+		t := chain[i]
+		if t.ID != "" {
+			merged.ID = t.ID
+		}
+		if t.Name != "" {
+			merged.Name = t.Name
+		}
+		if t.BasePath != "" {
+			merged.BasePath = t.BasePath
+		}
+		merged.Directories = append(merged.Directories, t.Directories...)
+		merged.Hooks = append(merged.Hooks, t.Hooks...)
+
+		// Variables: child overrides parent by name
+		for _, v := range t.Variables {
+			found := false
+			for j, existing := range merged.Variables {
+				if existing.Name == v.Name {
+					merged.Variables[j] = v
+					found = true
+					break
+				}
+			}
+			if !found {
+				merged.Variables = append(merged.Variables, v)
+			}
+		}
+	}
+
+	return &merged, nil
+}
+
+// Save writes the config to disk as YAML.
+func (c *Config) Save(path string) error {
+	data, err := yaml.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("marshaling config: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("creating config directory: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("writing config: %w", err)
 	}
 	return nil
 }

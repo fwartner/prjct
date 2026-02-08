@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ type Entry struct {
 	TemplateName string    `json:"template_name"`
 	Path         string    `json:"path"`
 	CreatedAt    time.Time `json:"created_at"`
+	Status       string    `json:"status,omitempty"`
 }
 
 // Index holds all tracked projects.
@@ -138,4 +140,28 @@ func FilterByTemplate(entries []Entry, templateID string) []Entry {
 		}
 	}
 	return results
+}
+
+// SortByCreatedDesc sorts entries by CreatedAt descending (newest first).
+func SortByCreatedDesc(entries []Entry) {
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].CreatedAt.After(entries[j].CreatedAt)
+	})
+}
+
+// Update modifies the entry with the given projectPath using the provided
+// function. If no entry matches, it is a no-op. The index is saved to disk.
+func Update(path string, projectPath string, fn func(*Entry)) error {
+	idx, err := Load(path)
+	if err != nil {
+		return err
+	}
+
+	for i := range idx.Projects {
+		if idx.Projects[i].Path == projectPath {
+			fn(&idx.Projects[i])
+			return Save(path, idx)
+		}
+	}
+	return nil
 }
