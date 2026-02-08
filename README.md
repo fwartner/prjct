@@ -116,6 +116,7 @@ The index is stored at `~/.config/prjct/projects.json` (macOS/Linux) or `%USERPR
 | `prjct reindex` | Discover existing projects from template base paths |
 | `prjct list` | List available templates |
 | `prjct config` | Show config file location |
+| `prjct config --edit` | Open config file in your editor |
 | `prjct doctor` | Validate configuration |
 | `prjct install` | Create default config file |
 | `prjct version` | Print version information |
@@ -156,6 +157,9 @@ The index is stored at `~/.config/prjct/projects.json` (macOS/Linux) or `%USERPR
 ### Config Format
 
 ```yaml
+# Optional: preferred editor for `prjct config --edit`
+# editor: "code --wait"
+
 templates:
   - id: video                    # Used in CLI: prjct video "name"
     name: "Video Production"     # Displayed in interactive menu
@@ -178,10 +182,20 @@ templates:
 
 ### Config Rules
 
-- Template `id` must be unique and cannot conflict with commands (`list`, `config`, `doctor`, `install`, `help`)
+- Template `id` must be unique and cannot conflict with commands (`list`, `config`, `doctor`, `install`, `search`, `reindex`, `help`)
 - `base_path` supports `~` expansion
 - Base path directories are created automatically if they don't exist
 - Nesting depth is limited to 20 levels
+
+### Editor Configuration
+
+`prjct config --edit` opens the config file in your preferred editor.
+
+Editor resolution order:
+1. `editor` field in `config.yaml` (e.g. `editor: "code --wait"`)
+2. `$VISUAL` environment variable
+3. `$EDITOR` environment variable
+4. Platform default: `open` (macOS), `notepad` (Windows), `vi` (Linux)
 
 ### Project Name Handling
 

@@ -119,4 +119,3 @@ func runReindex(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-
