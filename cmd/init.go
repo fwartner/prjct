@@ -100,6 +100,11 @@ func scanDir(path string) ([]config.Directory, error) {
 		d := config.Directory{Name: entry.Name()}
 		children, err := scanDir(filepath.Join(path, entry.Name()))
 		if err != nil {
+			// Skip directories we cannot read (e.g. permission denied)
+			if os.IsPermission(err) {
+				dirs = append(dirs, d)
+				continue
+			}
 			return nil, err
 		}
 		if len(children) > 0 {

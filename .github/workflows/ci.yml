@@ -132,7 +132,8 @@ jobs:
           ./prjct --config "$CFG" archive "CI-Renamed"
           ./prjct --config "$CFG" export dev -o /tmp/exported.yaml
           ./prjct --config "$CFG" import /tmp/exported.yaml
-          ./prjct --config "$CFG" init /tmp -o /tmp/init-out.yaml
+          mkdir -p /tmp/prjct-init-test/sub1/nested /tmp/prjct-init-test/sub2
+          ./prjct --config "$CFG" init /tmp/prjct-init-test -o /tmp/init-out.yaml
           ./prjct --config "$CFG" reindex
           ./prjct completion bash > /dev/null
 
