@@ -346,3 +346,93 @@ func TestFilterByTemplateNoMatch(t *testing.T) {
 		t.Errorf("FilterByTemplate(nonexistent) returned %d, want 0", len(results))
 	}
 }
+
+func TestSortByCreatedDesc(t *testing.T) {
+	now := time.Now()
+	entries := []Entry{
+		{Name: "old", CreatedAt: now.Add(-24 * time.Hour)},
+		{Name: "new", CreatedAt: now},
+		{Name: "mid", CreatedAt: now.Add(-1 * time.Hour)},
+	}
+
+	SortByCreatedDesc(entries)
+
+	if entries[0].Name != "new" {
+		t.Errorf("entries[0].Name = %q, want %q", entries[0].Name, "new")
+	}
+	if entries[1].Name != "mid" {
+		t.Errorf("entries[1].Name = %q, want %q", entries[1].Name, "mid")
+	}
+	if entries[2].Name != "old" {
+		t.Errorf("entries[2].Name = %q, want %q", entries[2].Name, "old")
+	}
+}
+
+func TestSortByCreatedDescEmpty(t *testing.T) {
+	var entries []Entry
+	SortByCreatedDesc(entries) // should not panic
+}
+
+func TestUpdate(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "projects.json")
+
+	_ = Add(path, Entry{Name: "proj", TemplateID: "dev", Path: "/projects/proj", CreatedAt: time.Now()})
+
+	err := Update(path, "/projects/proj", func(e *Entry) {
+		e.Name = "renamed"
+		e.Status = "archived"
+	})
+	if err != nil {
+		t.Fatalf("Update() error: %v", err)
+	}
+
+	idx, _ := Load(path)
+	if len(idx.Projects) != 1 {
+		t.Fatalf("expected 1 project, got %d", len(idx.Projects))
+	}
+	if idx.Projects[0].Name != "renamed" {
+		t.Errorf("Name = %q, want %q", idx.Projects[0].Name, "renamed")
+	}
+	if idx.Projects[0].Status != "archived" {
+		t.Errorf("Status = %q, want %q", idx.Projects[0].Status, "archived")
+	}
+}
+
+func TestUpdateNoMatch(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "projects.json")
+
+	_ = Add(path, Entry{Name: "proj", Path: "/projects/proj", CreatedAt: time.Now()})
+
+	err := Update(path, "/nonexistent", func(e *Entry) {
+		e.Name = "changed"
+	})
+	if err != nil {
+		t.Fatalf("Update() no-match error: %v", err)
+	}
+
+	idx, _ := Load(path)
+	if idx.Projects[0].Name != "proj" {
+		t.Error("entry should not be modified when path doesn't match")
+	}
+}
+
+func TestEntryStatus(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "projects.json")
+
+	entry := Entry{
+		Name:   "proj",
+		Path:   "/proj",
+		Status: "active",
+	}
+	if err := Add(path, entry); err != nil {
+		t.Fatal(err)
+	}
+
+	idx, _ := Load(path)
+	if idx.Projects[0].Status != "active" {
+		t.Errorf("Status = %q, want %q", idx.Projects[0].Status, "active")
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/fwartner/prjct/internal/config"
 	"github.com/fwartner/prjct/internal/index"
 	"github.com/fwartner/prjct/internal/project"
+	tmplpkg "github.com/fwartner/prjct/internal/template"
 	"github.com/spf13/cobra"
 )
 
@@ -42,6 +44,8 @@ func (e *ExitError) Unwrap() error { return e.Err }
 var (
 	verbose    bool
 	configPath string
+	dryRun     bool
+	profile    string
 )
 
 var rootCmd = &cobra.Command{
@@ -59,6 +63,8 @@ project name as arguments, or run interactively.`,
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", "config file path (overrides default)")
+	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "preview changes without creating anything")
+	rootCmd.PersistentFlags().StringVar(&profile, "profile", "", "config profile name (loads config.<profile>.yaml)")
 
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(configCmd)
@@ -66,6 +72,18 @@ func init() {
 	rootCmd.AddCommand(installCmd)
 	rootCmd.AddCommand(searchCmd)
 	rootCmd.AddCommand(reindexCmd)
+	rootCmd.AddCommand(completionCmd)
+	rootCmd.AddCommand(treeCmd)
+	rootCmd.AddCommand(pathCmd)
+	rootCmd.AddCommand(recentCmd)
+	rootCmd.AddCommand(statsCmd)
+	rootCmd.AddCommand(openCmd)
+	rootCmd.AddCommand(renameCmd)
+	rootCmd.AddCommand(archiveCmd)
+	rootCmd.AddCommand(diffCmd)
+	rootCmd.AddCommand(exportCmd)
+	rootCmd.AddCommand(importCmd)
+	rootCmd.AddCommand(initCmd)
 }
 
 // Execute runs the root command and returns an exit code.
@@ -100,14 +118,15 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		}
 	case 2:
 		// Non-interactive mode
-		tmpl = cfg.FindTemplate(args[0])
-		if tmpl == nil {
+		resolved, resolveErr := cfg.ResolveTemplate(args[0])
+		if resolveErr != nil {
 			ids := templateIDs(cfg)
 			return &ExitError{
 				Code:    ExitTemplateNotFound,
 				Message: fmt.Sprintf("template %q not found. Available: %s", args[0], strings.Join(ids, ", ")),
 			}
 		}
+		tmpl = resolved
 		projectName = args[1]
 	default:
 		return &ExitError{
@@ -125,28 +144,75 @@ func runRoot(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Build variables
+	vars := tmplpkg.BuiltinVars(sanitized, time.Now())
+
+	// Prompt for custom variables in interactive mode
+	if len(args) == 0 && len(tmpl.Variables) > 0 {
+		scanner := bufio.NewScanner(os.Stdin)
+		for _, v := range tmpl.Variables {
+			prompt := v.Prompt
+			if prompt == "" {
+				prompt = v.Name
+			}
+			if v.Default != "" {
+				fmt.Printf("%s [%s]: ", prompt, v.Default)
+			} else {
+				fmt.Printf("%s: ", prompt)
+			}
+			if scanner.Scan() {
+				val := strings.TrimSpace(scanner.Text())
+				if val == "" {
+					val = v.Default
+				}
+				vars[v.Name] = val
+			} else {
+				vars[v.Name] = v.Default
+			}
+		}
+	} else {
+		// Non-interactive: use defaults
+		for _, v := range tmpl.Variables {
+			vars[v.Name] = v.Default
+		}
+	}
+
 	// Create directory structure
-	result, err := project.Create(tmpl, sanitized, verbose)
+	opts := project.CreateOptions{
+		Verbose:   verbose,
+		DryRun:    dryRun,
+		Variables: vars,
+	}
+	result, err := project.Create(tmpl, sanitized, opts)
 	if err != nil {
 		return mapCreateError(err)
 	}
 
 	// Best-effort index update — don't fail the command if indexing fails
-	if idxPath, idxErr := resolveIndexPath(); idxErr == nil {
-		_ = index.Add(idxPath, index.Entry{
-			Name:         sanitized,
-			TemplateID:   tmpl.ID,
-			TemplateName: tmpl.Name,
-			Path:         result.ProjectPath,
-			CreatedAt:    time.Now(),
-		})
+	if !dryRun {
+		if idxPath, idxErr := resolveIndexPath(); idxErr == nil {
+			_ = index.Add(idxPath, index.Entry{
+				Name:         sanitized,
+				TemplateID:   tmpl.ID,
+				TemplateName: tmpl.Name,
+				Path:         result.ProjectPath,
+				CreatedAt:    time.Now(),
+			})
+		}
 	}
 
-	fmt.Printf("Project created successfully!\n")
+	if dryRun {
+		fmt.Printf("Dry run — no directories created\n")
+	} else {
+		fmt.Printf("Project created successfully!\n")
+	}
 	fmt.Printf("  Template: %s\n", result.TemplateName)
 	fmt.Printf("  Name:     %s\n", sanitized)
 	fmt.Printf("  Path:     %s\n", result.ProjectPath)
 	fmt.Printf("  Folders:  %d\n", result.DirsCreated)
+	if result.FilesCreated > 0 {
+		fmt.Printf("  Files:    %d\n", result.FilesCreated)
+	}
 
 	return nil
 }
@@ -202,6 +268,12 @@ func loadConfig() (*config.Config, error) {
 		if err != nil {
 			return nil, &ExitError{Code: ExitGeneral, Message: err.Error()}
 		}
+	}
+
+	// Apply profile: config.yaml → config.<profile>.yaml
+	if profile != "" {
+		dir := filepath.Dir(path)
+		path = filepath.Join(dir, fmt.Sprintf("config.%s.yaml", profile))
 	}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {

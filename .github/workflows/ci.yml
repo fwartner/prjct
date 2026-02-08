@@ -113,26 +113,45 @@ jobs:
       - name: Smoke test (Unix)
         if: runner.os != 'Windows'
         run: |
+          CFG=/tmp/prjct-test-config.yaml
           ./prjct --help
           ./prjct version
-          ./prjct install --config /tmp/prjct-test-config.yaml --force
-          ./prjct --config /tmp/prjct-test-config.yaml doctor
-          ./prjct --config /tmp/prjct-test-config.yaml list
-          ./prjct --config /tmp/prjct-test-config.yaml search
-          ./prjct --config /tmp/prjct-test-config.yaml dev "CI-Test-Project"
-          ./prjct --config /tmp/prjct-test-config.yaml search "CI-Test"
-          ./prjct --config /tmp/prjct-test-config.yaml reindex
+          ./prjct install --config "$CFG" --force
+          ./prjct --config "$CFG" doctor
+          ./prjct --config "$CFG" list
+          ./prjct --config "$CFG" search
+          ./prjct --config "$CFG" tree dev
+          ./prjct --config "$CFG" --dry-run dev "DryRunTest"
+          ./prjct --config "$CFG" dev "CI-Test-Project"
+          ./prjct --config "$CFG" search "CI-Test"
+          ./prjct --config "$CFG" recent
+          ./prjct --config "$CFG" stats
+          ./prjct --config "$CFG" path "CI-Test"
+          ./prjct --config "$CFG" diff dev "$(./prjct --config "$CFG" path "CI-Test")"
+          ./prjct --config "$CFG" rename "CI-Test" "CI-Renamed"
+          ./prjct --config "$CFG" archive "CI-Renamed"
+          ./prjct --config "$CFG" export dev -o /tmp/exported.yaml
+          ./prjct --config "$CFG" import /tmp/exported.yaml
+          ./prjct --config "$CFG" init /tmp -o /tmp/init-out.yaml
+          ./prjct --config "$CFG" reindex
+          ./prjct completion bash > /dev/null
 
       - name: Smoke test (Windows)
         if: runner.os == 'Windows'
         shell: bash
         run: |
+          CFG="$RUNNER_TEMP/prjct-test-config.yaml"
           ./prjct.exe --help
           ./prjct.exe version
-          ./prjct.exe install --config "$RUNNER_TEMP/prjct-test-config.yaml" --force
-          ./prjct.exe --config "$RUNNER_TEMP/prjct-test-config.yaml" doctor
-          ./prjct.exe --config "$RUNNER_TEMP/prjct-test-config.yaml" list
-          ./prjct.exe --config "$RUNNER_TEMP/prjct-test-config.yaml" search
-          ./prjct.exe --config "$RUNNER_TEMP/prjct-test-config.yaml" dev "CI-Test-Project"
-          ./prjct.exe --config "$RUNNER_TEMP/prjct-test-config.yaml" search "CI-Test"
-          ./prjct.exe --config "$RUNNER_TEMP/prjct-test-config.yaml" reindex
+          ./prjct.exe install --config "$CFG" --force
+          ./prjct.exe --config "$CFG" doctor
+          ./prjct.exe --config "$CFG" list
+          ./prjct.exe --config "$CFG" search
+          ./prjct.exe --config "$CFG" tree dev
+          ./prjct.exe --config "$CFG" --dry-run dev "DryRunTest"
+          ./prjct.exe --config "$CFG" dev "CI-Test-Project"
+          ./prjct.exe --config "$CFG" search "CI-Test"
+          ./prjct.exe --config "$CFG" recent
+          ./prjct.exe --config "$CFG" stats
+          ./prjct.exe --config "$CFG" reindex
+          ./prjct.exe completion bash > /dev/null

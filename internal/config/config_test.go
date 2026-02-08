@@ -384,6 +384,325 @@ func TestValidationErrorString(t *testing.T) {
 	}
 }
 
+// --- New feature tests ---
+
+func TestValidateFileTemplateEmptyName(t *testing.T) {
+	cfg := &Config{
+		Templates: []Template{
+			{
+				ID:       "test",
+				Name:     "Test",
+				BasePath: "/tmp",
+				Directories: []Directory{
+					{
+						Name:  "src",
+						Files: []FileTemplate{{Name: ""}},
+					},
+				},
+			},
+		},
+	}
+
+	errs := cfg.Validate()
+	if len(errs) == 0 {
+		t.Fatal("expected error for empty file name")
+	}
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e.Message, "file name is required") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected 'file name is required' error")
+	}
+}
+
+func TestValidateVariableNameRequired(t *testing.T) {
+	cfg := &Config{
+		Templates: []Template{
+			{
+				ID:          "test",
+				Name:        "Test",
+				BasePath:    "/tmp",
+				Directories: []Directory{{Name: "src"}},
+				Variables:   []Variable{{Name: ""}},
+			},
+		},
+	}
+
+	errs := cfg.Validate()
+	if len(errs) == 0 {
+		t.Fatal("expected error for empty variable name")
+	}
+}
+
+func TestValidateVariableNameInvalid(t *testing.T) {
+	cfg := &Config{
+		Templates: []Template{
+			{
+				ID:          "test",
+				Name:        "Test",
+				BasePath:    "/tmp",
+				Directories: []Directory{{Name: "src"}},
+				Variables:   []Variable{{Name: "123invalid"}},
+			},
+		},
+	}
+
+	errs := cfg.Validate()
+	if len(errs) == 0 {
+		t.Fatal("expected error for invalid variable name")
+	}
+}
+
+func TestValidateVariableNameValid(t *testing.T) {
+	cfg := &Config{
+		Templates: []Template{
+			{
+				ID:          "test",
+				Name:        "Test",
+				BasePath:    "/tmp",
+				Directories: []Directory{{Name: "src"}},
+				Variables:   []Variable{{Name: "my_var"}, {Name: "_private"}, {Name: "CamelCase"}},
+			},
+		},
+	}
+
+	errs := cfg.Validate()
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for valid variable names, got %v", errs)
+	}
+}
+
+func TestValidateExtendsUnknown(t *testing.T) {
+	cfg := &Config{
+		Templates: []Template{
+			{
+				ID:       "child",
+				Name:     "Child",
+				BasePath: "/tmp",
+				Extends:  "nonexistent",
+			},
+		},
+	}
+
+	errs := cfg.Validate()
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e.Message, "references unknown template") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected 'references unknown template' error")
+	}
+}
+
+func TestValidateExtendsSelf(t *testing.T) {
+	cfg := &Config{
+		Templates: []Template{
+			{
+				ID:          "self",
+				Name:        "Self",
+				BasePath:    "/tmp",
+				Directories: []Directory{{Name: "src"}},
+				Extends:     "self",
+			},
+		},
+	}
+
+	errs := cfg.Validate()
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e.Message, "cannot extend itself") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected 'cannot extend itself' error")
+	}
+}
+
+func TestValidateCircularInheritance(t *testing.T) {
+	cfg := &Config{
+		Templates: []Template{
+			{ID: "a", Name: "A", BasePath: "/tmp", Directories: []Directory{{Name: "x"}}, Extends: "b"},
+			{ID: "b", Name: "B", BasePath: "/tmp", Directories: []Directory{{Name: "y"}}, Extends: "a"},
+		},
+	}
+
+	errs := cfg.Validate()
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e.Message, "circular inheritance") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected 'circular inheritance' error")
+	}
+}
+
+func TestValidateExtendsAllowsEmptyDirs(t *testing.T) {
+	cfg := &Config{
+		Templates: []Template{
+			{ID: "base", Name: "Base", BasePath: "/tmp", Directories: []Directory{{Name: "src"}}},
+			{ID: "child", Name: "Child", BasePath: "/tmp", Extends: "base"},
+		},
+	}
+
+	errs := cfg.Validate()
+	if len(errs) != 0 {
+		t.Errorf("child with extends should not require directories, got %v", errs)
+	}
+}
+
+func TestResolveTemplateSimple(t *testing.T) {
+	cfg := &Config{
+		Templates: []Template{
+			{ID: "test", Name: "Test", BasePath: "/tmp", Directories: []Directory{{Name: "src"}}},
+		},
+	}
+
+	tmpl, err := cfg.ResolveTemplate("test")
+	if err != nil {
+		t.Fatalf("ResolveTemplate() error: %v", err)
+	}
+	if tmpl.ID != "test" {
+		t.Errorf("ID = %q, want %q", tmpl.ID, "test")
+	}
+}
+
+func TestResolveTemplateInheritance(t *testing.T) {
+	cfg := &Config{
+		Templates: []Template{
+			{
+				ID:          "base",
+				Name:        "Base",
+				BasePath:    "/base",
+				Directories: []Directory{{Name: "shared"}},
+				Hooks:       []string{"echo base"},
+				Variables:   []Variable{{Name: "env", Default: "dev"}},
+			},
+			{
+				ID:          "child",
+				Name:        "Child",
+				BasePath:    "/child",
+				Directories: []Directory{{Name: "extra"}},
+				Hooks:       []string{"echo child"},
+				Variables:   []Variable{{Name: "env", Default: "prod"}, {Name: "region"}},
+				Extends:     "base",
+			},
+		},
+	}
+
+	tmpl, err := cfg.ResolveTemplate("child")
+	if err != nil {
+		t.Fatalf("ResolveTemplate() error: %v", err)
+	}
+
+	if tmpl.ID != "child" {
+		t.Errorf("ID = %q, want %q", tmpl.ID, "child")
+	}
+	if tmpl.BasePath != "/child" {
+		t.Errorf("BasePath = %q, want %q", tmpl.BasePath, "/child")
+	}
+	// Should have both parent + child dirs
+	if len(tmpl.Directories) != 2 {
+		t.Errorf("Directories count = %d, want 2", len(tmpl.Directories))
+	}
+	// Hooks: parent then child
+	if len(tmpl.Hooks) != 2 {
+		t.Errorf("Hooks count = %d, want 2", len(tmpl.Hooks))
+	}
+	// Variables: env should be overridden, region added
+	if len(tmpl.Variables) != 2 {
+		t.Errorf("Variables count = %d, want 2", len(tmpl.Variables))
+	}
+	for _, v := range tmpl.Variables {
+		if v.Name == "env" && v.Default != "prod" {
+			t.Errorf("env default = %q, want %q (child override)", v.Default, "prod")
+		}
+	}
+}
+
+func TestResolveTemplateNotFound(t *testing.T) {
+	cfg := &Config{
+		Templates: []Template{
+			{ID: "test", Name: "Test", BasePath: "/tmp", Directories: []Directory{{Name: "src"}}},
+		},
+	}
+
+	_, err := cfg.ResolveTemplate("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for nonexistent template")
+	}
+}
+
+func TestSaveConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "saved.yaml")
+
+	cfg := &Config{
+		Templates: []Template{
+			{ID: "test", Name: "Test", BasePath: "/tmp", Directories: []Directory{{Name: "src"}}},
+		},
+	}
+
+	if err := cfg.Save(path); err != nil {
+		t.Fatalf("Save() error: %v", err)
+	}
+
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if len(loaded.Templates) != 1 {
+		t.Errorf("round-trip: got %d templates, want 1", len(loaded.Templates))
+	}
+	if loaded.Templates[0].ID != "test" {
+		t.Errorf("round-trip: ID = %q, want %q", loaded.Templates[0].ID, "test")
+	}
+}
+
+func TestValidateOptionalDirectory(t *testing.T) {
+	cfg := &Config{
+		Templates: []Template{
+			{
+				ID:       "test",
+				Name:     "Test",
+				BasePath: "/tmp",
+				Directories: []Directory{
+					{Name: "required"},
+					{Name: "maybe", Optional: true},
+				},
+			},
+		},
+	}
+
+	errs := cfg.Validate()
+	if len(errs) != 0 {
+		t.Errorf("expected no errors with optional dir, got %v", errs)
+	}
+}
+
+func TestValidateNewReservedIDs(t *testing.T) {
+	newReserved := []string{"open", "completion", "tree", "path", "recent", "stats", "rename", "archive", "export", "import", "init", "diff"}
+	for _, id := range newReserved {
+		cfg := &Config{
+			Templates: []Template{
+				{ID: id, Name: "Test", BasePath: "/tmp", Directories: []Directory{{Name: "src"}}},
+			},
+		}
+
+		errs := cfg.Validate()
+		if len(errs) == 0 {
+			t.Errorf("expected error for new reserved ID %q", id)
+		}
+	}
+}
+
 func writeTemp(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()

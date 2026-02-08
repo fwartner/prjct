@@ -23,7 +23,7 @@ func TestCreateBasic(t *testing.T) {
 		},
 	}
 
-	result, err := Create(tmpl, "MyProject", false)
+	result, err := Create(tmpl, "MyProject", CreateOptions{})
 	if err != nil {
 		t.Fatalf("Create() error: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestCreateNested(t *testing.T) {
 		},
 	}
 
-	result, err := Create(tmpl, "DeepProject", false)
+	result, err := Create(tmpl, "DeepProject", CreateOptions{})
 	if err != nil {
 		t.Fatalf("Create() error: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestCreateComplexStructure(t *testing.T) {
 		},
 	}
 
-	result, err := Create(tmpl, "Commercial", false)
+	result, err := Create(tmpl, "Commercial", CreateOptions{})
 	if err != nil {
 		t.Fatalf("Create() error: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestCreateProjectExists(t *testing.T) {
 		},
 	}
 
-	_, err := Create(tmpl, "Existing", false)
+	_, err := Create(tmpl, "Existing", CreateOptions{})
 	if err == nil {
 		t.Fatal("Create() expected error for existing project, got nil")
 	}
@@ -178,7 +178,7 @@ func TestCreateWithSpacesInName(t *testing.T) {
 		},
 	}
 
-	result, err := Create(tmpl, "Client Commercial 2026", false)
+	result, err := Create(tmpl, "Client Commercial 2026", CreateOptions{})
 	if err != nil {
 		t.Fatalf("Create() error: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestCreateWithTildeExpansion(t *testing.T) {
 		},
 	}
 
-	result, err := Create(tmpl, "TildeTest", false)
+	result, err := Create(tmpl, "TildeTest", CreateOptions{})
 	if err != nil {
 		t.Fatalf("Create() error: %v", err)
 	}
@@ -226,7 +226,7 @@ func TestCreateVerbose(t *testing.T) {
 	}
 
 	// Verbose mode should not cause errors
-	result, err := Create(tmpl, "VerboseProject", true)
+	result, err := Create(tmpl, "VerboseProject", CreateOptions{Verbose: true})
 	if err != nil {
 		t.Fatalf("Create() with verbose error: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestCreateCreatesBasePath(t *testing.T) {
 		},
 	}
 
-	result, err := Create(tmpl, "Project", false)
+	result, err := Create(tmpl, "Project", CreateOptions{})
 	if err != nil {
 		t.Fatalf("Create() error: %v", err)
 	}
@@ -275,7 +275,7 @@ func TestFlatten(t *testing.T) {
 		{Name: "e"},
 	}
 
-	paths := flatten(dirs, "")
+	paths := Flatten(dirs, "")
 
 	expected := []string{
 		"a",
@@ -286,20 +286,20 @@ func TestFlatten(t *testing.T) {
 	}
 
 	if len(paths) != len(expected) {
-		t.Fatalf("flatten() returned %d paths, want %d: %v", len(paths), len(expected), paths)
+		t.Fatalf("Flatten() returned %d paths, want %d: %v", len(paths), len(expected), paths)
 	}
 
 	for i, want := range expected {
 		if paths[i] != want {
-			t.Errorf("flatten()[%d] = %q, want %q", i, paths[i], want)
+			t.Errorf("Flatten()[%d] = %q, want %q", i, paths[i], want)
 		}
 	}
 }
 
 func TestFlattenEmpty(t *testing.T) {
-	paths := flatten(nil, "")
+	paths := Flatten(nil, "")
 	if len(paths) != 0 {
-		t.Errorf("flatten(nil) returned %d paths, want 0", len(paths))
+		t.Errorf("Flatten(nil) returned %d paths, want 0", len(paths))
 	}
 }
 
@@ -308,13 +308,13 @@ func TestFlattenWithPrefix(t *testing.T) {
 		{Name: "child"},
 	}
 
-	paths := flatten(dirs, "parent")
+	paths := Flatten(dirs, "parent")
 	if len(paths) != 1 {
-		t.Fatalf("flatten() returned %d paths, want 1", len(paths))
+		t.Fatalf("Flatten() returned %d paths, want 1", len(paths))
 	}
 	want := filepath.Join("parent", "child")
 	if paths[0] != want {
-		t.Errorf("flatten()[0] = %q, want %q", paths[0], want)
+		t.Errorf("Flatten()[0] = %q, want %q", paths[0], want)
 	}
 }
 
@@ -342,11 +342,191 @@ func TestCreatePermissionDenied(t *testing.T) {
 		},
 	}
 
-	_, err := Create(tmpl, "Forbidden", false)
+	_, err := Create(tmpl, "Forbidden", CreateOptions{})
 	if err == nil {
 		t.Fatal("Create() expected error for permission denied, got nil")
 	}
 	if !errors.Is(err, ErrPermission) {
 		t.Errorf("Create() error = %v, want ErrPermission", err)
+	}
+}
+
+func TestCreateDryRun(t *testing.T) {
+	base := t.TempDir()
+	tmpl := &config.Template{
+		ID:       "test",
+		Name:     "Test",
+		BasePath: base,
+		Directories: []config.Directory{
+			{Name: "src"},
+			{Name: "docs"},
+		},
+	}
+
+	result, err := Create(tmpl, "DryProject", CreateOptions{DryRun: true})
+	if err != nil {
+		t.Fatalf("Create() dry-run error: %v", err)
+	}
+
+	if result.DirsCreated != 3 { // root + 2 dirs
+		t.Errorf("DirsCreated = %d, want 3", result.DirsCreated)
+	}
+
+	// Verify nothing was created on disk
+	projectPath := filepath.Join(base, "DryProject")
+	if _, err := os.Stat(projectPath); !os.IsNotExist(err) {
+		t.Error("dry-run should not create directories")
+	}
+}
+
+func TestCreateWithFiles(t *testing.T) {
+	base := t.TempDir()
+	tmpl := &config.Template{
+		ID:       "test",
+		Name:     "Test",
+		BasePath: base,
+		Directories: []config.Directory{
+			{
+				Name: "src",
+				Files: []config.FileTemplate{
+					{Name: "main.go", Content: "package main\n"},
+					{Name: ".gitkeep"},
+				},
+			},
+		},
+	}
+
+	result, err := Create(tmpl, "FileProject", CreateOptions{})
+	if err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+
+	if result.FilesCreated != 2 {
+		t.Errorf("FilesCreated = %d, want 2", result.FilesCreated)
+	}
+
+	mainGo := filepath.Join(result.ProjectPath, "src", "main.go")
+	data, err := os.ReadFile(mainGo)
+	if err != nil {
+		t.Fatalf("reading main.go: %v", err)
+	}
+	if string(data) != "package main\n" {
+		t.Errorf("main.go content = %q, want %q", string(data), "package main\n")
+	}
+}
+
+func TestCreateWithOptionalDirs(t *testing.T) {
+	base := t.TempDir()
+	tmpl := &config.Template{
+		ID:       "test",
+		Name:     "Test",
+		BasePath: base,
+		Directories: []config.Directory{
+			{Name: "src"},
+			{Name: "optional-dir", Optional: true},
+		},
+	}
+
+	result, err := Create(tmpl, "OptProject", CreateOptions{
+		SkipOptional: map[string]bool{"optional-dir": true},
+	})
+	if err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+
+	if result.DirsCreated != 2 { // root + src (optional skipped)
+		t.Errorf("DirsCreated = %d, want 2", result.DirsCreated)
+	}
+
+	optPath := filepath.Join(result.ProjectPath, "optional-dir")
+	if _, err := os.Stat(optPath); !os.IsNotExist(err) {
+		t.Error("optional directory should have been skipped")
+	}
+}
+
+func TestCreateWithVariables(t *testing.T) {
+	base := t.TempDir()
+	tmpl := &config.Template{
+		ID:       "test",
+		Name:     "Test",
+		BasePath: base,
+		Directories: []config.Directory{
+			{Name: "{name}-src"},
+		},
+	}
+
+	result, err := Create(tmpl, "VarProject", CreateOptions{
+		Variables: map[string]string{"name": "VarProject"},
+	})
+	if err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+
+	dirPath := filepath.Join(result.ProjectPath, "VarProject-src")
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		t.Error("variable-expanded directory was not created")
+	}
+}
+
+func TestCreateWithHooks(t *testing.T) {
+	base := t.TempDir()
+	tmpl := &config.Template{
+		ID:       "test",
+		Name:     "Test",
+		BasePath: base,
+		Directories: []config.Directory{
+			{Name: "src"},
+		},
+		Hooks: []string{"echo hello"},
+	}
+
+	hookCalled := false
+	old := ExecHook
+	ExecHook = func(command string, dir string) error {
+		hookCalled = true
+		if command != "echo hello" {
+			t.Errorf("hook command = %q, want %q", command, "echo hello")
+		}
+		return nil
+	}
+	defer func() { ExecHook = old }()
+
+	_, err := Create(tmpl, "HookProject", CreateOptions{})
+	if err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+
+	if !hookCalled {
+		t.Error("hook was not called")
+	}
+}
+
+func TestCreateHookFailure(t *testing.T) {
+	base := t.TempDir()
+	tmpl := &config.Template{
+		ID:       "test",
+		Name:     "Test",
+		BasePath: base,
+		Directories: []config.Directory{
+			{Name: "src"},
+		},
+		Hooks: []string{"false"},
+	}
+
+	old := ExecHook
+	ExecHook = func(command string, dir string) error {
+		return errors.New("hook failed")
+	}
+	defer func() { ExecHook = old }()
+
+	_, err := Create(tmpl, "HookFailProject", CreateOptions{})
+	if err == nil {
+		t.Fatal("Create() expected error for hook failure")
+	}
+
+	// Directories should still exist (no rollback for hook failure)
+	projectPath := filepath.Join(base, "HookFailProject")
+	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		t.Error("project directory should exist despite hook failure")
 	}
 }

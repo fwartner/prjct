@@ -86,6 +86,14 @@ prjct photo "Product Shoot Q1"
 prjct dev "api-gateway"
 ```
 
+### Dry run
+
+Preview what would be created without making any changes:
+
+```bash
+prjct --dry-run video "Test Project"
+```
+
 ### Searching projects
 
 Every project you create is automatically indexed. Search by name, template, or path:
@@ -111,14 +119,27 @@ The index is stored at `~/.config/prjct/projects.json` (macOS/Linux) or `%USERPR
 |---------|-------------|
 | `prjct` | Interactive project creation |
 | `prjct <template> <name>` | Non-interactive creation |
-| `prjct search [query]` | Search indexed projects by name, template, or path |
+| `prjct search [query]` | Search indexed projects |
 | `prjct search -t <id>` | Search filtered by template ID |
 | `prjct reindex` | Discover existing projects from template base paths |
 | `prjct list` | List available templates |
+| `prjct tree <template-id>` | Preview template directory structure as ASCII tree |
+| `prjct open <query>` | Open a project in the file manager |
+| `prjct open --terminal <query>` | Open a project in a terminal |
+| `prjct path <query>` | Print matching project path (for scripting) |
+| `prjct recent [n]` | Show recently created projects (default: 10) |
+| `prjct stats` | Show project statistics grouped by template |
+| `prjct rename <query> <new-name>` | Rename a project on disk and in the index |
+| `prjct archive <query>` | Archive a project as `.tar.gz` |
+| `prjct diff <template-id> <path>` | Compare project directories against template |
+| `prjct export <template-id>` | Export a template to a standalone YAML file |
+| `prjct import <file>` | Import templates from a YAML file |
+| `prjct init <path>` | Generate a template from an existing directory |
 | `prjct config` | Show config file location |
 | `prjct config --edit` | Open config file in your editor |
 | `prjct doctor` | Validate configuration |
 | `prjct install` | Create default config file |
+| `prjct completion <shell>` | Generate shell completions (bash/zsh/fish/powershell) |
 | `prjct version` | Print version information |
 
 ### Flags
@@ -127,6 +148,8 @@ The index is stored at `~/.config/prjct/projects.json` (macOS/Linux) or `%USERPR
 |------|-------------|
 | `-v, --verbose` | Show detailed output during creation |
 | `--config <path>` | Override config file location |
+| `--dry-run` | Preview changes without creating anything |
+| `--profile <name>` | Load `config.<name>.yaml` instead of default |
 | `-h, --help` | Show help |
 
 ### Exit Codes
@@ -154,6 +177,15 @@ The index is stored at `~/.config/prjct/projects.json` (macOS/Linux) or `%USERPR
 | Linux | `~/.config/prjct/config.yaml` |
 | Windows | `%USERPROFILE%\.prjct\config.yaml` |
 
+### Config Profiles
+
+Use `--profile` to load alternative config files:
+
+```bash
+prjct --profile work list       # loads config.work.yaml
+prjct --profile personal video "My Project"
+```
+
 ### Config Format
 
 ```yaml
@@ -180,12 +212,96 @@ templates:
       - name: "04_Delivery"
 ```
 
+### File Templates
+
+Create files alongside directories:
+
+```yaml
+directories:
+  - name: "src"
+    files:
+      - name: "main.go"
+        content: "package main"
+      - name: ".gitkeep"
+```
+
+### Optional Directories
+
+Mark directories as optional to prompt the user during interactive creation:
+
+```yaml
+directories:
+  - name: "src"
+  - name: "vendor"
+    optional: true
+```
+
+### Template Variables
+
+Define variables that are resolved during project creation. Built-in variables: `{name}`, `{date}`, `{year}`, `{month}`, `{day}`.
+
+```yaml
+templates:
+  - id: video
+    name: "Video Production"
+    base_path: "~/Projects/Video"
+    variables:
+      - name: client
+        prompt: "Client name"
+        default: "Unknown"
+    directories:
+      - name: "{client}"
+        children:
+          - name: "Footage"
+```
+
+### Post-Creation Hooks
+
+Run commands after project creation:
+
+```yaml
+templates:
+  - id: dev
+    name: "Development"
+    base_path: "~/Projects"
+    hooks:
+      - "git init"
+      - "npm init -y"
+    directories:
+      - name: "src"
+```
+
+### Template Inheritance
+
+Extend a base template to avoid repeating common directories:
+
+```yaml
+templates:
+  - id: base
+    name: "Base"
+    base_path: "~/Projects"
+    directories:
+      - name: "docs"
+      - name: "assets"
+
+  - id: webapp
+    name: "Web App"
+    base_path: "~/Projects/Web"
+    extends: base
+    directories:
+      - name: "src"
+      - name: "tests"
+```
+
+The child inherits the parent's directories, hooks, and variables. Child values override parent values for variables with the same name. Child `base_path` overrides parent if set.
+
 ### Config Rules
 
-- Template `id` must be unique and cannot conflict with commands (`list`, `config`, `doctor`, `install`, `search`, `reindex`, `help`)
+- Template `id` must be unique and cannot conflict with built-in commands
 - `base_path` supports `~` expansion
 - Base path directories are created automatically if they don't exist
 - Nesting depth is limited to 20 levels
+- Variable names must match `[a-zA-Z_][a-zA-Z0-9_]*`
 
 ### Editor Configuration
 
@@ -241,14 +357,27 @@ prjct/
     root.go                  # Root command, interactive/non-interactive modes
     install.go               # prjct install
     list.go                  # prjct list
-    config.go                # prjct config
+    config.go                # prjct config [--edit]
     doctor.go                # prjct doctor
     search.go                # prjct search
     reindex.go               # prjct reindex
+    completion.go            # prjct completion
+    tree.go                  # prjct tree
+    open.go                  # prjct open
+    path.go                  # prjct path
+    recent.go                # prjct recent
+    stats.go                 # prjct stats
+    rename.go                # prjct rename
+    archive.go               # prjct archive
+    diff.go                  # prjct diff
+    export.go                # prjct export
+    import_cmd.go            # prjct import
+    init.go                  # prjct init
   internal/
-    config/                  # YAML config loading, validation, path resolution
-    index/                   # Project index (JSON persistence, search)
-    project/                 # Directory creation, name sanitization
+    config/                  # YAML config loading, validation, inheritance
+    index/                   # Project index (JSON persistence, search, sort)
+    project/                 # Directory/file creation, hooks, name sanitization
+    template/                # Variable resolution engine
 ```
 
 ## License
