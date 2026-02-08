@@ -7,8 +7,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fwartner/prjct/internal/config"
+	"github.com/fwartner/prjct/internal/index"
 	"github.com/fwartner/prjct/internal/project"
 	"github.com/spf13/cobra"
 )
@@ -62,6 +64,8 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(installCmd)
+	rootCmd.AddCommand(searchCmd)
+	rootCmd.AddCommand(reindexCmd)
 }
 
 // Execute runs the root command and returns an exit code.
@@ -125,6 +129,17 @@ func runRoot(cmd *cobra.Command, args []string) error {
 	result, err := project.Create(tmpl, sanitized, verbose)
 	if err != nil {
 		return mapCreateError(err)
+	}
+
+	// Best-effort index update — don't fail the command if indexing fails
+	if idxPath, idxErr := resolveIndexPath(); idxErr == nil {
+		_ = index.Add(idxPath, index.Entry{
+			Name:         sanitized,
+			TemplateID:   tmpl.ID,
+			TemplateName: tmpl.Name,
+			Path:         result.ProjectPath,
+			CreatedAt:    time.Now(),
+		})
 	}
 
 	fmt.Printf("Project created successfully!\n")

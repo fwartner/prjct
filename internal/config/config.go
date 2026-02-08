@@ -45,6 +45,8 @@ var reservedIDs = map[string]bool{
 	"doctor":  true,
 	"help":    true,
 	"install": true,
+	"search":  true,
+	"reindex": true,
 }
 
 // Load reads and parses the config file at the given path.
