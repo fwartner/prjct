@@ -1,0 +1,80 @@
+version: 2
+
+project_name: prjct
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - main: .
+    binary: prjct
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/fwartner/prjct/cmd.Version={{.Version}}
+      - -X github.com/fwartner/prjct/cmd.Commit={{.ShortCommit}}
+      - -X github.com/fwartner/prjct/cmd.Date={{.Date}}
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+  groups:
+    - title: Features
+      regexp: "^.*feat.*$"
+      order: 0
+    - title: Bug Fixes
+      regexp: "^.*fix.*$"
+      order: 1
+    - title: Other
+      order: 999
+
+brews:
+  - repository:
+      owner: fwartner
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/fwartner/prjct"
+    description: "Create project directory structures from YAML templates"
+    license: "MIT"
+    install: |
+      bin.install "prjct"
+    test: |
+      system "#{bin}/prjct", "version"
+
+release:
+  github:
+    owner: fwartner
+    name: prjct
+  draft: false
+  prerelease: auto
+  name_template: "v{{.Version}}"

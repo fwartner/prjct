@@ -1,0 +1,21 @@
+# Binary
+prjct
+prjct.exe
+prjct-linux
+prjct-*
+
+# GoReleaser
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+coverage.out
