@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/fwartner/prjct/internal/config"
@@ -318,6 +319,9 @@ func TestFlattenWithPrefix(t *testing.T) {
 }
 
 func TestCreatePermissionDenied(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping permission test on Windows (no Unix-style directory permissions)")
+	}
 	if os.Getuid() == 0 {
 		t.Skip("skipping permission test as root")
 	}
@@ -327,7 +331,7 @@ func TestCreatePermissionDenied(t *testing.T) {
 	if err := os.Mkdir(readonlyDir, 0555); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
-	defer os.Chmod(readonlyDir, 0755) // cleanup
+	defer func() { _ = os.Chmod(readonlyDir, 0755) }()
 
 	tmpl := &config.Template{
 		ID:       "test",
