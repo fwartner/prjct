@@ -71,7 +71,7 @@ func TestRunExportDefaultOutput(t *testing.T) {
 	if err := os.Chdir(dir); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chdir(oldWd) })
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 	cmd := &cobra.Command{}
 	err := runExport(cmd, []string{"mytemplate"})

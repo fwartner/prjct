@@ -70,9 +70,7 @@ func Create(tmpl *config.Template, projectName string, opts CreateOptions) (*Res
 
 	created := []string{projectRoot}
 	createdFiles := []string{}
-	dirCount := 1
-	fileCount := 0
-
+	var dirCount, fileCount int
 	var createErr error
 	dirCount, fileCount, createErr = createTree(tmpl.Directories, projectRoot, opts, &created, &createdFiles)
 	dirCount++ // add root
