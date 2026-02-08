@@ -109,8 +109,12 @@ func TestRunReindexWithTemplateFilter(t *testing.T) {
 	cfgDir := t.TempDir()
 
 	// Create projects in both base paths
-	os.Mkdir(filepath.Join(base, "ProjA"), 0755)
-	os.Mkdir(filepath.Join(base2, "ProjB"), 0755)
+	if err := os.Mkdir(filepath.Join(base, "ProjA"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(base2, "ProjB"), 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	content := fmt.Sprintf(`templates:
   - id: video
@@ -125,7 +129,9 @@ func TestRunReindexWithTemplateFilter(t *testing.T) {
       - name: "raw"
 `, base, base2)
 	cfgPath := filepath.Join(cfgDir, "config.yaml")
-	os.WriteFile(cfgPath, []byte(content), 0644)
+	if err := os.WriteFile(cfgPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 	setConfigPath(t, cfgPath)
 	setReindexTemplate(t, "video")
 	setVerbose(t, false)
@@ -158,7 +164,9 @@ func TestRunReindexEmptyBasePath(t *testing.T) {
       - name: "src"
 `, base)
 	cfgPath := filepath.Join(cfgDir, "config.yaml")
-	os.WriteFile(cfgPath, []byte(content), 0644)
+	if err := os.WriteFile(cfgPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 	setConfigPath(t, cfgPath)
 	setReindexTemplate(t, "")
 	setVerbose(t, false)
@@ -187,7 +195,9 @@ func TestRunReindexNonexistentBasePath(t *testing.T) {
       - name: "src"
 `
 	cfgPath := filepath.Join(cfgDir, "config.yaml")
-	os.WriteFile(cfgPath, []byte(content), 0644)
+	if err := os.WriteFile(cfgPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 	setConfigPath(t, cfgPath)
 	setReindexTemplate(t, "")
 	setVerbose(t, false)
@@ -230,7 +240,9 @@ func TestRunReindexTemplateNotFound(t *testing.T) {
       - name: "src"
 `, base)
 	cfgPath := filepath.Join(cfgDir, "config.yaml")
-	os.WriteFile(cfgPath, []byte(content), 0644)
+	if err := os.WriteFile(cfgPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 	setConfigPath(t, cfgPath)
 	setReindexTemplate(t, "nonexistent")
 	setVerbose(t, false)
@@ -266,7 +278,9 @@ func TestRunReindexPreservesExisting(t *testing.T) {
 		},
 	}
 	data, _ := json.MarshalIndent(preIdx, "", "  ")
-	os.WriteFile(idxPath, data, 0644)
+	if err := os.WriteFile(idxPath, data, 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	cmd := &cobra.Command{}
 	err := runReindex(cmd, nil)

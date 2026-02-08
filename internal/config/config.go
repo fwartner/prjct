@@ -25,6 +25,7 @@ type Template struct {
 
 // Config is the root configuration containing all templates.
 type Config struct {
+	Editor    string     `yaml:"editor,omitempty"`
 	Templates []Template `yaml:"templates"`
 }
 

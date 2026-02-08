@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/fwartner/prjct/internal/config"
 	"github.com/fwartner/prjct/internal/index"
@@ -121,5 +120,3 @@ func runReindex(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// reindexTime is used for testing; defaults to time.Now
-var reindexTime = func() time.Time { return time.Now() }

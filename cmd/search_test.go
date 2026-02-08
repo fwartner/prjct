@@ -141,7 +141,8 @@ func TestRunSearchCorruptIndex(t *testing.T) {
 }
 
 func TestResolveIndexPathWithConfig(t *testing.T) {
-	setConfigPath(t, "/some/dir/config.yaml")
+	dir := t.TempDir()
+	setConfigPath(t, filepath.Join(dir, "config.yaml"))
 	p, err := resolveIndexPath()
 	if err != nil {
 		t.Fatalf("resolveIndexPath() error: %v", err)
@@ -149,8 +150,9 @@ func TestResolveIndexPathWithConfig(t *testing.T) {
 	if filepath.Base(p) != "projects.json" {
 		t.Errorf("resolveIndexPath() = %q, want projects.json filename", p)
 	}
-	if filepath.Dir(p) != "/some/dir" {
-		t.Errorf("resolveIndexPath() dir = %q, want /some/dir", filepath.Dir(p))
+	want := dir
+	if filepath.Dir(p) != want {
+		t.Errorf("resolveIndexPath() dir = %q, want %q", filepath.Dir(p), want)
 	}
 }
 
