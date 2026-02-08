@@ -86,12 +86,34 @@ prjct photo "Product Shoot Q1"
 prjct dev "api-gateway"
 ```
 
+### Searching projects
+
+Every project you create is automatically indexed. Search by name, template, or path:
+
+```bash
+prjct search                    # list all indexed projects
+prjct search "commercial"       # substring search (case-insensitive)
+prjct search -t video           # filter by template ID
+```
+
+To index projects created before this feature or outside of `prjct`:
+
+```bash
+prjct reindex                   # scan all template base paths
+prjct reindex -t video          # scan only one template
+```
+
+The index is stored at `~/.config/prjct/projects.json` (macOS/Linux) or `%USERPROFILE%\.prjct\projects.json` (Windows).
+
 ### Commands
 
 | Command | Description |
 |---------|-------------|
 | `prjct` | Interactive project creation |
 | `prjct <template> <name>` | Non-interactive creation |
+| `prjct search [query]` | Search indexed projects by name, template, or path |
+| `prjct search -t <id>` | Search filtered by template ID |
+| `prjct reindex` | Discover existing projects from template base paths |
 | `prjct list` | List available templates |
 | `prjct config` | Show config file location |
 | `prjct doctor` | Validate configuration |
@@ -207,8 +229,11 @@ prjct/
     list.go                  # prjct list
     config.go                # prjct config
     doctor.go                # prjct doctor
+    search.go                # prjct search
+    reindex.go               # prjct reindex
   internal/
     config/                  # YAML config loading, validation, path resolution
+    index/                   # Project index (JSON persistence, search)
     project/                 # Directory creation, name sanitization
 ```
 

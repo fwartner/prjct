@@ -19,3 +19,6 @@ Thumbs.db
 
 # Test
 coverage.out
+
+# Claude Code
+CLAUDE.md

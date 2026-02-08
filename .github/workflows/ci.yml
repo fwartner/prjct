@@ -118,6 +118,10 @@ jobs:
           ./prjct install --config /tmp/prjct-test-config.yaml --force
           ./prjct --config /tmp/prjct-test-config.yaml doctor
           ./prjct --config /tmp/prjct-test-config.yaml list
+          ./prjct --config /tmp/prjct-test-config.yaml search
+          ./prjct --config /tmp/prjct-test-config.yaml dev "CI-Test-Project"
+          ./prjct --config /tmp/prjct-test-config.yaml search "CI-Test"
+          ./prjct --config /tmp/prjct-test-config.yaml reindex
 
       - name: Smoke test (Windows)
         if: runner.os == 'Windows'
@@ -128,3 +132,7 @@ jobs:
           ./prjct.exe install --config "$RUNNER_TEMP/prjct-test-config.yaml" --force
           ./prjct.exe --config "$RUNNER_TEMP/prjct-test-config.yaml" doctor
           ./prjct.exe --config "$RUNNER_TEMP/prjct-test-config.yaml" list
+          ./prjct.exe --config "$RUNNER_TEMP/prjct-test-config.yaml" search
+          ./prjct.exe --config "$RUNNER_TEMP/prjct-test-config.yaml" dev "CI-Test-Project"
+          ./prjct.exe --config "$RUNNER_TEMP/prjct-test-config.yaml" search "CI-Test"
+          ./prjct.exe --config "$RUNNER_TEMP/prjct-test-config.yaml" reindex
