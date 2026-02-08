@@ -77,4 +77,7 @@ release:
     name: prjct
   draft: false
   prerelease: auto
+  replace_existing_artifacts: true
+  replace_existing_draft: true
+  mode: replace
   name_template: "v{{.Version}}"
