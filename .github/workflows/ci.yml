@@ -102,8 +102,13 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Build binary
+      - name: Build binary (Unix)
+        if: runner.os != 'Windows'
         run: go build -o prjct .
+
+      - name: Build binary (Windows)
+        if: runner.os == 'Windows'
+        run: go build -o prjct.exe .
 
       - name: Smoke test (Unix)
         if: runner.os != 'Windows'
@@ -116,6 +121,10 @@ jobs:
 
       - name: Smoke test (Windows)
         if: runner.os == 'Windows'
+        shell: bash
         run: |
-          .\prjct.exe --help
-          .\prjct.exe version
+          ./prjct.exe --help
+          ./prjct.exe version
+          ./prjct.exe install --config "$RUNNER_TEMP/prjct-test-config.yaml" --force
+          ./prjct.exe --config "$RUNNER_TEMP/prjct-test-config.yaml" doctor
+          ./prjct.exe --config "$RUNNER_TEMP/prjct-test-config.yaml" list
