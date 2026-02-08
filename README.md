@@ -13,7 +13,7 @@ Professionals working with asset-heavy production pipelines (video, photo, desig
 
 ## Installation
 
-### Homebrew (macOS & Linux)
+### Homebrew (macOS)
 
 ```bash
 brew tap fwartner/tap
