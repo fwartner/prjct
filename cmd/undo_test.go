@@ -29,7 +29,7 @@ func TestRunUndoCreate(t *testing.T) {
 
 	// Create a directory to be undone
 	projectDir := filepath.Join(base, "UndoMe")
-	os.MkdirAll(projectDir, 0755)
+	_ = os.MkdirAll(projectDir, 0755)
 
 	// Write journal entry
 	jPath := filepath.Join(filepath.Dir(cfgPath), "journal.json")
@@ -62,7 +62,7 @@ func TestRunUndoRename(t *testing.T) {
 
 	// Create the "new" directory (post-rename state)
 	newDir := filepath.Join(base, "NewName")
-	os.MkdirAll(newDir, 0755)
+	_ = os.MkdirAll(newDir, 0755)
 
 	oldDir := filepath.Join(base, "OldName")
 

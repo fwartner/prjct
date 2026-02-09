@@ -19,7 +19,7 @@ func TestRunInfo(t *testing.T) {
 
 	// Create project with content
 	projectDir := filepath.Join(base, "InfoProject")
-	os.MkdirAll(filepath.Join(projectDir, "src"), 0755)
+	_ = os.MkdirAll(filepath.Join(projectDir, "src"), 0755)
 	_ = os.WriteFile(filepath.Join(projectDir, "src", "main.go"), []byte("package main"), 0644)
 
 	idxPath := filepath.Join(filepath.Dir(cfgPath), "projects.json")

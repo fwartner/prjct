@@ -53,8 +53,8 @@ func TestRunSyncAlreadyInSync(t *testing.T) {
 
 	// Create a complete project
 	projectDir := filepath.Join(base, "Complete")
-	os.MkdirAll(filepath.Join(projectDir, "src"), 0755)
-	os.MkdirAll(filepath.Join(projectDir, "docs"), 0755)
+	_ = os.MkdirAll(filepath.Join(projectDir, "src"), 0755)
+	_ = os.MkdirAll(filepath.Join(projectDir, "docs"), 0755)
 
 	idxPath := filepath.Join(filepath.Dir(cfgPath), "projects.json")
 	idx := &index.Index{

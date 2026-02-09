@@ -18,9 +18,9 @@ func TestRunClean(t *testing.T) {
 
 	// Create project with empty dirs
 	projectDir := filepath.Join(base, "Messy")
-	os.MkdirAll(filepath.Join(projectDir, "src"), 0755)
-	os.MkdirAll(filepath.Join(projectDir, "empty1"), 0755)
-	os.MkdirAll(filepath.Join(projectDir, "empty2", "nested"), 0755)
+	_ = os.MkdirAll(filepath.Join(projectDir, "src"), 0755)
+	_ = os.MkdirAll(filepath.Join(projectDir, "empty1"), 0755)
+	_ = os.MkdirAll(filepath.Join(projectDir, "empty2", "nested"), 0755)
 	// src has a file so it won't be removed
 	_ = os.WriteFile(filepath.Join(projectDir, "src", "main.go"), []byte("x"), 0644)
 
@@ -59,7 +59,7 @@ func TestRunCleanNoEmpty(t *testing.T) {
 	setConfigPath(t, cfgPath)
 
 	projectDir := filepath.Join(base, "Full")
-	os.MkdirAll(filepath.Join(projectDir, "src"), 0755)
+	_ = os.MkdirAll(filepath.Join(projectDir, "src"), 0755)
 	_ = os.WriteFile(filepath.Join(projectDir, "src", "a.txt"), []byte("x"), 0644)
 
 	idxPath := filepath.Join(filepath.Dir(cfgPath), "projects.json")

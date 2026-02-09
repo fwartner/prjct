@@ -17,7 +17,7 @@ func TestScanAndIndex(t *testing.T) {
 	setConfigPath(t, cfgPath)
 
 	// Create a directory in the base path that looks like a project
-	os.MkdirAll(filepath.Join(base, "NewProject"), 0755)
+	_ = os.MkdirAll(filepath.Join(base, "NewProject"), 0755)
 
 	idxPath := filepath.Join(filepath.Dir(cfgPath), "projects.json")
 	cfg := &config.Config{
@@ -51,7 +51,7 @@ func TestScanAndIndexSkipsExisting(t *testing.T) {
 	setConfigPath(t, cfgPath)
 
 	projectDir := filepath.Join(base, "Existing")
-	os.MkdirAll(projectDir, 0755)
+	_ = os.MkdirAll(projectDir, 0755)
 
 	// Pre-populate index
 	idxPath := filepath.Join(filepath.Dir(cfgPath), "projects.json")

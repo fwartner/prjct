@@ -26,8 +26,8 @@ func TestRunClone(t *testing.T) {
 
 	// Create source project
 	sourceDir := filepath.Join(base, "Original")
-	os.MkdirAll(filepath.Join(sourceDir, "src"), 0755)
-	os.MkdirAll(filepath.Join(sourceDir, "docs"), 0755)
+	_ = os.MkdirAll(filepath.Join(sourceDir, "src"), 0755)
+	_ = os.MkdirAll(filepath.Join(sourceDir, "docs"), 0755)
 
 	idxPath := filepath.Join(filepath.Dir(cfgPath), "projects.json")
 	idx := &index.Index{
@@ -62,7 +62,7 @@ func TestRunCloneWithFiles(t *testing.T) {
 
 	// Create source with a file
 	sourceDir := filepath.Join(base, "Source")
-	os.MkdirAll(filepath.Join(sourceDir, "src"), 0755)
+	_ = os.MkdirAll(filepath.Join(sourceDir, "src"), 0755)
 	_ = os.WriteFile(filepath.Join(sourceDir, "src", "main.go"), []byte("package main"), 0644)
 
 	idxPath := filepath.Join(filepath.Dir(cfgPath), "projects.json")
@@ -116,8 +116,8 @@ func TestRunCloneDestExists(t *testing.T) {
 	setConfigPath(t, cfgPath)
 
 	sourceDir := filepath.Join(base, "Src")
-	os.MkdirAll(sourceDir, 0755)
-	os.MkdirAll(filepath.Join(base, "Exists"), 0755) // dest exists
+	_ = os.MkdirAll(sourceDir, 0755)
+	_ = os.MkdirAll(filepath.Join(base, "Exists"), 0755) // dest exists
 
 	idxPath := filepath.Join(filepath.Dir(cfgPath), "projects.json")
 	idx := &index.Index{
