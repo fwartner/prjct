@@ -5,7 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"time"
+
 	"github.com/fwartner/prjct/internal/index"
+	"github.com/fwartner/prjct/internal/journal"
 	"github.com/fwartner/prjct/internal/project"
 	"github.com/spf13/cobra"
 )
@@ -58,6 +61,20 @@ func runRename(cmd *cobra.Command, args []string) error {
 	}); err != nil {
 		// Best effort — print warning but don't fail
 		fmt.Fprintf(os.Stderr, "Warning: index update failed: %v\n", err)
+	}
+
+	// Best-effort journal recording
+	if jPath, jErr := resolveJournalPath(); jErr == nil {
+		_ = journal.Append(jPath, journal.Record{
+			Timestamp: time.Now(),
+			Operation: journal.OpRename,
+			Details: map[string]string{
+				"old_path": oldPath,
+				"new_path": newPath,
+				"old_name": entry.Name,
+				"new_name": newName,
+			},
+		})
 	}
 
 	fmt.Printf("Renamed: %s\n", oldPath)

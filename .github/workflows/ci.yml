@@ -135,6 +135,24 @@ jobs:
           mkdir -p /tmp/prjct-init-test/sub1/nested /tmp/prjct-init-test/sub2
           ./prjct --config "$CFG" init /tmp/prjct-init-test -o /tmp/init-out.yaml
           ./prjct --config "$CFG" reindex
+          ./prjct --config "$CFG" info "CI-Renamed"
+          ./prjct --config "$CFG" note "CI-Renamed" "smoke test note"
+          ./prjct --config "$CFG" note "CI-Renamed"
+          ./prjct --config "$CFG" clean "CI-Renamed" --dry-run
+          ./prjct --config "$CFG" sync "CI-Renamed" --dry-run
+          ./prjct --config "$CFG" readme dev
+          ./prjct --config "$CFG" validate "$CFG"
+          BULK_FILE=/tmp/prjct-bulk.yaml
+          cat > "$BULK_FILE" <<BULK
+          projects:
+            - template: dev
+              name: "BulkSmoke1"
+            - template: dev
+              name: "BulkSmoke2"
+          BULK
+          ./prjct --config "$CFG" bulk "$BULK_FILE"
+          ./prjct --config "$CFG" clone "CI-Renamed" "CI-Clone"
+          ./prjct --config "$CFG" undo
           ./prjct completion bash > /dev/null
 
       - name: Smoke test (Windows)
@@ -155,4 +173,7 @@ jobs:
           ./prjct.exe --config "$CFG" recent
           ./prjct.exe --config "$CFG" stats
           ./prjct.exe --config "$CFG" reindex
+          ./prjct.exe --config "$CFG" readme dev
+          ./prjct.exe --config "$CFG" validate "$CFG"
+          ./prjct.exe --config "$CFG" undo
           ./prjct.exe completion bash > /dev/null

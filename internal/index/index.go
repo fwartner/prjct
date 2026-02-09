@@ -21,6 +21,7 @@ type Entry struct {
 	Path         string    `json:"path"`
 	CreatedAt    time.Time `json:"created_at"`
 	Status       string    `json:"status,omitempty"`
+	Notes        []string  `json:"notes,omitempty"`
 }
 
 // Index holds all tracked projects.
@@ -147,6 +148,96 @@ func SortByCreatedDesc(entries []Entry) {
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].CreatedAt.After(entries[j].CreatedAt)
 	})
+}
+
+// FuzzySearch returns entries where any searchable field is within the given
+// edit-distance threshold of the query. Falls back to substring matching first.
+func FuzzySearch(idx *Index, query string, maxDist int) []Entry {
+	if query == "" {
+		return idx.Projects
+	}
+
+	// First try exact substring match
+	results := Search(idx, query)
+	if len(results) > 0 {
+		return results
+	}
+
+	// Fuzzy match using Levenshtein distance on individual fields
+	q := strings.ToLower(query)
+	for _, e := range idx.Projects {
+		fields := []string{
+			strings.ToLower(e.Name),
+			strings.ToLower(e.TemplateID),
+			strings.ToLower(e.TemplateName),
+		}
+		for _, f := range fields {
+			if levenshtein(q, f) <= maxDist || containsFuzzy(f, q, maxDist) {
+				results = append(results, e)
+				break
+			}
+		}
+	}
+	return results
+}
+
+// levenshtein computes the edit distance between two strings.
+func levenshtein(a, b string) int {
+	la, lb := len(a), len(b)
+	if la == 0 {
+		return lb
+	}
+	if lb == 0 {
+		return la
+	}
+
+	prev := make([]int, lb+1)
+	curr := make([]int, lb+1)
+
+	for j := 0; j <= lb; j++ {
+		prev[j] = j
+	}
+
+	for i := 1; i <= la; i++ {
+		curr[0] = i
+		for j := 1; j <= lb; j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			curr[j] = minInt(curr[j-1]+1, minInt(prev[j]+1, prev[j-1]+cost))
+		}
+		prev, curr = curr, prev
+	}
+	return prev[lb]
+}
+
+// containsFuzzy checks if any substring of haystack of length len(needle)±maxDist
+// is within maxDist edits of needle.
+func containsFuzzy(haystack, needle string, maxDist int) bool {
+	if len(needle) > len(haystack)+maxDist {
+		return false
+	}
+	// Slide a window and check distance
+	windowSize := len(needle)
+	for start := 0; start <= len(haystack)-windowSize+maxDist && start < len(haystack); start++ {
+		end := start + windowSize + maxDist
+		if end > len(haystack) {
+			end = len(haystack)
+		}
+		sub := haystack[start:end]
+		if levenshtein(needle, sub) <= maxDist {
+			return true
+		}
+	}
+	return false
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // Update modifies the entry with the given projectPath using the provided

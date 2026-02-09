@@ -10,20 +10,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var searchTemplate string
+var (
+	searchTemplate string
+	searchFuzzy    bool
+)
 
 var searchCmd = &cobra.Command{
 	Use:   "search [query]",
 	Short: "Search indexed projects",
 	Long: `Search for previously created projects by name, template, or path.
 Run without a query to list all indexed projects.
-Use --template to filter by template ID.`,
+Use --template to filter by template ID.
+Use --fuzzy for approximate matching.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runSearch,
 }
 
 func init() {
 	searchCmd.Flags().StringVarP(&searchTemplate, "template", "t", "", "filter by template ID")
+	searchCmd.Flags().BoolVar(&searchFuzzy, "fuzzy", false, "enable fuzzy (approximate) matching")
 }
 
 func runSearch(cmd *cobra.Command, args []string) error {
@@ -42,7 +47,12 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		query = args[0]
 	}
 
-	results := index.Search(idx, query)
+	var results []index.Entry
+	if searchFuzzy && query != "" {
+		results = index.FuzzySearch(idx, query, 2)
+	} else {
+		results = index.Search(idx, query)
+	}
 
 	if searchTemplate != "" {
 		results = index.FilterByTemplate(results, searchTemplate)

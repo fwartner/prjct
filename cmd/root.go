@@ -12,6 +12,7 @@ import (
 
 	"github.com/fwartner/prjct/internal/config"
 	"github.com/fwartner/prjct/internal/index"
+	"github.com/fwartner/prjct/internal/journal"
 	"github.com/fwartner/prjct/internal/project"
 	tmplpkg "github.com/fwartner/prjct/internal/template"
 	"github.com/spf13/cobra"
@@ -84,6 +85,16 @@ func init() {
 	rootCmd.AddCommand(exportCmd)
 	rootCmd.AddCommand(importCmd)
 	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(syncCmd)
+	rootCmd.AddCommand(cloneCmd)
+	rootCmd.AddCommand(cleanCmd)
+	rootCmd.AddCommand(noteCmd)
+	rootCmd.AddCommand(infoCmd)
+	rootCmd.AddCommand(validateCmd)
+	rootCmd.AddCommand(bulkCmd)
+	rootCmd.AddCommand(undoCmd)
+	rootCmd.AddCommand(readmeCmd)
+	rootCmd.AddCommand(watchCmd)
 }
 
 // Execute runs the root command and returns an exit code.
@@ -197,6 +208,18 @@ func runRoot(cmd *cobra.Command, args []string) error {
 				TemplateName: tmpl.Name,
 				Path:         result.ProjectPath,
 				CreatedAt:    time.Now(),
+			})
+		}
+		// Best-effort journal recording
+		if jPath, jErr := resolveJournalPath(); jErr == nil {
+			_ = journal.Append(jPath, journal.Record{
+				Timestamp: time.Now(),
+				Operation: journal.OpCreate,
+				Details: map[string]string{
+					"path":     result.ProjectPath,
+					"template": tmpl.ID,
+					"name":     sanitized,
+				},
 			})
 		}
 	}

@@ -468,6 +468,75 @@ func TestCreateWithVariables(t *testing.T) {
 	}
 }
 
+func TestCreateWithWhenCondition(t *testing.T) {
+	base := t.TempDir()
+	tmpl := &config.Template{
+		ID:       "test",
+		Name:     "Test",
+		BasePath: base,
+		Directories: []config.Directory{
+			{Name: "src"},
+			{Name: "ci", When: "use_ci == yes"},
+			{Name: "docs", When: "use_docs"},
+		},
+	}
+
+	// ci should be skipped (use_ci != "yes"), docs should be skipped (use_docs empty)
+	result, err := Create(tmpl, "WhenProject", CreateOptions{
+		Variables: map[string]string{"use_ci": "no"},
+	})
+	if err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+
+	if result.DirsCreated != 2 { // root + src
+		t.Errorf("DirsCreated = %d, want 2", result.DirsCreated)
+	}
+
+	ciPath := filepath.Join(result.ProjectPath, "ci")
+	if _, err := os.Stat(ciPath); !os.IsNotExist(err) {
+		t.Error("ci directory should have been skipped (when condition false)")
+	}
+
+	docsPath := filepath.Join(result.ProjectPath, "docs")
+	if _, err := os.Stat(docsPath); !os.IsNotExist(err) {
+		t.Error("docs directory should have been skipped (variable not set)")
+	}
+}
+
+func TestCreateWithWhenConditionTrue(t *testing.T) {
+	base := t.TempDir()
+	tmpl := &config.Template{
+		ID:       "test",
+		Name:     "Test",
+		BasePath: base,
+		Directories: []config.Directory{
+			{Name: "src"},
+			{Name: "ci", When: "use_ci == yes"},
+			{Name: "docs", When: "use_docs"},
+		},
+	}
+
+	// ci should be created (use_ci == "yes"), docs should be created (use_docs is truthy)
+	result, err := Create(tmpl, "WhenTrueProject", CreateOptions{
+		Variables: map[string]string{"use_ci": "yes", "use_docs": "true"},
+	})
+	if err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+
+	if result.DirsCreated != 4 { // root + src + ci + docs
+		t.Errorf("DirsCreated = %d, want 4", result.DirsCreated)
+	}
+
+	for _, name := range []string{"src", "ci", "docs"} {
+		p := filepath.Join(result.ProjectPath, name)
+		if _, err := os.Stat(p); os.IsNotExist(err) {
+			t.Errorf("directory %q should have been created", name)
+		}
+	}
+}
+
 func TestCreateWithHooks(t *testing.T) {
 	base := t.TempDir()
 	tmpl := &config.Template{

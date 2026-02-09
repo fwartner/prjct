@@ -688,7 +688,7 @@ func TestValidateOptionalDirectory(t *testing.T) {
 }
 
 func TestValidateNewReservedIDs(t *testing.T) {
-	newReserved := []string{"open", "completion", "tree", "path", "recent", "stats", "rename", "archive", "export", "import", "init", "diff"}
+	newReserved := []string{"open", "completion", "tree", "path", "recent", "stats", "rename", "archive", "export", "import", "init", "diff", "sync", "clone", "clean", "note", "info", "validate", "bulk", "undo", "readme", "watch"}
 	for _, id := range newReserved {
 		cfg := &Config{
 			Templates: []Template{
@@ -700,6 +700,128 @@ func TestValidateNewReservedIDs(t *testing.T) {
 		if len(errs) == 0 {
 			t.Errorf("expected error for new reserved ID %q", id)
 		}
+	}
+}
+
+// --- EvalWhen tests ---
+
+func TestEvalWhenEmpty(t *testing.T) {
+	if !EvalWhen("", nil) {
+		t.Error("empty when should return true")
+	}
+}
+
+func TestEvalWhenEquals(t *testing.T) {
+	vars := map[string]string{"lang": "go"}
+	if !EvalWhen("lang == go", vars) {
+		t.Error("lang == go should be true")
+	}
+	if EvalWhen("lang == python", vars) {
+		t.Error("lang == python should be false")
+	}
+}
+
+func TestEvalWhenNotEquals(t *testing.T) {
+	vars := map[string]string{"lang": "go"}
+	if !EvalWhen("lang != python", vars) {
+		t.Error("lang != python should be true")
+	}
+	if EvalWhen("lang != go", vars) {
+		t.Error("lang != go should be false")
+	}
+}
+
+func TestEvalWhenTruthy(t *testing.T) {
+	vars := map[string]string{"feature_x": "yes"}
+	if !EvalWhen("feature_x", vars) {
+		t.Error("truthy check should be true for non-empty")
+	}
+	if EvalWhen("missing_var", vars) {
+		t.Error("truthy check should be false for missing var")
+	}
+}
+
+// --- MatchesTags tests ---
+
+func TestMatchesTagsEmpty(t *testing.T) {
+	tmpl := Template{Tags: []string{"a", "b"}}
+	if !tmpl.MatchesTags(nil) {
+		t.Error("empty filter should match all")
+	}
+	if !tmpl.MatchesTags([]string{}) {
+		t.Error("empty filter should match all")
+	}
+}
+
+func TestMatchesTagsMatch(t *testing.T) {
+	tmpl := Template{Tags: []string{"video", "production"}}
+	if !tmpl.MatchesTags([]string{"video"}) {
+		t.Error("should match video")
+	}
+	if !tmpl.MatchesTags([]string{"production"}) {
+		t.Error("should match production")
+	}
+}
+
+func TestMatchesTagsNoMatch(t *testing.T) {
+	tmpl := Template{Tags: []string{"video"}}
+	if tmpl.MatchesTags([]string{"photo"}) {
+		t.Error("should not match photo")
+	}
+}
+
+func TestMatchesTagsCaseInsensitive(t *testing.T) {
+	tmpl := Template{Tags: []string{"Video"}}
+	if !tmpl.MatchesTags([]string{"video"}) {
+		t.Error("matching should be case-insensitive")
+	}
+}
+
+func TestMatchesTagsNoTags(t *testing.T) {
+	tmpl := Template{}
+	if tmpl.MatchesTags([]string{"video"}) {
+		t.Error("template with no tags should not match a filter")
+	}
+}
+
+// --- Tags/When YAML parsing tests ---
+
+func TestLoadTemplateWithTags(t *testing.T) {
+	content := `templates:
+  - id: tagged
+    name: "Tagged"
+    base_path: "/tmp"
+    tags: [video, production]
+    directories:
+      - name: "src"
+`
+	path := writeTemp(t, content)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.Templates[0].Tags) != 2 {
+		t.Errorf("expected 2 tags, got %d", len(cfg.Templates[0].Tags))
+	}
+}
+
+func TestLoadDirectoryWithWhen(t *testing.T) {
+	content := `templates:
+  - id: cond
+    name: "Conditional"
+    base_path: "/tmp"
+    directories:
+      - name: "src"
+        when: "lang == go"
+      - name: "docs"
+`
+	path := writeTemp(t, content)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Templates[0].Directories[0].When != "lang == go" {
+		t.Errorf("When = %q, want %q", cfg.Templates[0].Directories[0].When, "lang == go")
 	}
 }
 

@@ -436,3 +436,105 @@ func TestEntryStatus(t *testing.T) {
 		t.Errorf("Status = %q, want %q", idx.Projects[0].Status, "active")
 	}
 }
+
+// --- Notes field tests ---
+
+func TestEntryNotes(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "projects.json")
+
+	entry := Entry{
+		Name:  "proj",
+		Path:  "/proj",
+		Notes: []string{"Client: Acme", "Deadline: March"},
+	}
+	if err := Add(path, entry); err != nil {
+		t.Fatal(err)
+	}
+
+	idx, _ := Load(path)
+	if len(idx.Projects[0].Notes) != 2 {
+		t.Errorf("Notes count = %d, want 2", len(idx.Projects[0].Notes))
+	}
+	if idx.Projects[0].Notes[0] != "Client: Acme" {
+		t.Errorf("Notes[0] = %q, want %q", idx.Projects[0].Notes[0], "Client: Acme")
+	}
+}
+
+// --- Levenshtein tests ---
+
+func TestLevenshtein(t *testing.T) {
+	tests := []struct {
+		a, b string
+		want int
+	}{
+		{"", "", 0},
+		{"abc", "", 3},
+		{"", "abc", 3},
+		{"abc", "abc", 0},
+		{"abc", "abd", 1},
+		{"kitten", "sitting", 3},
+		{"video", "vido", 1},
+	}
+	for _, tt := range tests {
+		got := levenshtein(tt.a, tt.b)
+		if got != tt.want {
+			t.Errorf("levenshtein(%q, %q) = %d, want %d", tt.a, tt.b, got, tt.want)
+		}
+	}
+}
+
+// --- FuzzySearch tests ---
+
+func TestFuzzySearchExactMatch(t *testing.T) {
+	idx := &Index{
+		Projects: []Entry{
+			{Name: "video-project", TemplateID: "video", Path: "/projects/video-project"},
+		},
+	}
+	results := FuzzySearch(idx, "video-project", 2)
+	if len(results) != 1 {
+		t.Fatalf("FuzzySearch exact: got %d, want 1", len(results))
+	}
+}
+
+func TestFuzzySearchTypo(t *testing.T) {
+	idx := &Index{
+		Projects: []Entry{
+			{Name: "video", TemplateID: "video", Path: "/p/video"},
+			{Name: "photo", TemplateID: "photo", Path: "/p/photo"},
+		},
+	}
+	results := FuzzySearch(idx, "vido", 2) // 1 edit away from "video"
+	if len(results) != 1 {
+		t.Fatalf("FuzzySearch typo: got %d, want 1", len(results))
+	}
+	if results[0].Name != "video" {
+		t.Errorf("FuzzySearch typo: got %q, want %q", results[0].Name, "video")
+	}
+}
+
+func TestFuzzySearchNoMatch(t *testing.T) {
+	idx := &Index{
+		Projects: []Entry{
+			{Name: "video", TemplateID: "video", Path: "/p/video"},
+		},
+	}
+	results := FuzzySearch(idx, "zzzzz", 2)
+	if len(results) != 0 {
+		t.Errorf("FuzzySearch no match: got %d, want 0", len(results))
+	}
+}
+
+func TestFuzzySearchEmpty(t *testing.T) {
+	idx := &Index{
+		Projects: []Entry{
+			{Name: "a", Path: "/a"},
+			{Name: "b", Path: "/b"},
+		},
+	}
+	results := FuzzySearch(idx, "", 2)
+	if len(results) != 2 {
+		t.Errorf("FuzzySearch empty: got %d, want 2", len(results))
+	}
+}

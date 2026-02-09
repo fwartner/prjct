@@ -114,6 +114,11 @@ func createTree(dirs []config.Directory, parentPath string, opts CreateOptions, 
 			continue
 		}
 
+		// Evaluate conditional directory
+		if d.When != "" && !config.EvalWhen(d.When, opts.Variables) {
+			continue
+		}
+
 		fullPath := filepath.Join(parentPath, dirName)
 		if opts.Verbose {
 			fmt.Fprintf(os.Stderr, "  mkdir %s\n", fullPath)

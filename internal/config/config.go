@@ -29,6 +29,7 @@ type Directory struct {
 	Children []Directory    `yaml:"children,omitempty"`
 	Files    []FileTemplate `yaml:"files,omitempty"`
 	Optional bool           `yaml:"optional,omitempty"`
+	When     string         `yaml:"when,omitempty"`
 }
 
 // Template represents a project template with its directory structure.
@@ -40,6 +41,7 @@ type Template struct {
 	Hooks       []string    `yaml:"hooks,omitempty"`
 	Variables   []Variable  `yaml:"variables,omitempty"`
 	Extends     string      `yaml:"extends,omitempty"`
+	Tags        []string    `yaml:"tags,omitempty"`
 }
 
 // Config is the root configuration containing all templates.
@@ -80,6 +82,16 @@ var reservedIDs = map[string]bool{
 	"init":       true,
 	"diff":       true,
 	"version":    true,
+	"sync":       true,
+	"clone":      true,
+	"clean":      true,
+	"note":       true,
+	"info":       true,
+	"validate":   true,
+	"bulk":       true,
+	"undo":       true,
+	"readme":     true,
+	"watch":      true,
 }
 
 // Load reads and parses the config file at the given path.
@@ -350,6 +362,51 @@ func (c *Config) Save(path string) error {
 		return fmt.Errorf("writing config: %w", err)
 	}
 	return nil
+}
+
+// MatchesTags returns true if the template has at least one of the given tags.
+// An empty filter matches everything.
+func (t *Template) MatchesTags(tags []string) bool {
+	if len(tags) == 0 {
+		return true
+	}
+	tagSet := make(map[string]bool, len(t.Tags))
+	for _, tag := range t.Tags {
+		tagSet[strings.ToLower(tag)] = true
+	}
+	for _, f := range tags {
+		if tagSet[strings.ToLower(f)] {
+			return true
+		}
+	}
+	return false
+}
+
+// EvalWhen evaluates a simple condition string against variables.
+// Supported forms: "key == value", "key != value", "key" (truthy check).
+// Returns true if the condition is met or the condition is empty.
+func EvalWhen(when string, vars map[string]string) bool {
+	when = strings.TrimSpace(when)
+	if when == "" {
+		return true
+	}
+
+	// "key != value"
+	if parts := strings.SplitN(when, "!=", 2); len(parts) == 2 {
+		k := strings.TrimSpace(parts[0])
+		v := strings.TrimSpace(parts[1])
+		return vars[k] != v
+	}
+
+	// "key == value"
+	if parts := strings.SplitN(when, "==", 2); len(parts) == 2 {
+		k := strings.TrimSpace(parts[0])
+		v := strings.TrimSpace(parts[1])
+		return vars[k] == v
+	}
+
+	// Truthy: variable exists and is non-empty
+	return vars[when] != ""
 }
 
 // ExpandPath resolves ~ to the user's home directory in a path string.
